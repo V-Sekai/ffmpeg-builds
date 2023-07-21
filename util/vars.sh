@@ -31,7 +31,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 REPO="${GITHUB_REPOSITORY:-btbn/ffmpeg-builds}"
-REPO="${REPO,,}"
+REPO=$(echo "$REPO" | tr '[:upper:]' '[:lower:]') # Convert to lowercase
 REGISTRY="${REGISTRY_OVERRIDE:-ghcr.io}"
 BASE_IMAGE="${REGISTRY}/${REPO}/base:latest"
 TARGET_IMAGE="${REGISTRY}/${REPO}/base-${TARGET}:latest"

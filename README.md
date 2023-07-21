@@ -55,14 +55,14 @@ The linuxarm64 target will not build some dependencies due to lack of arm64 (aar
 * `libmfx` and `libva`: Library for Intel QSV, so there is no aarch64 support.
 
 Available variants:
-* `gpl` Includes all dependencies, even those that require full GPL instead of just LGPL.
-* `lgpl` Lacking libraries that are GPL-only. Most prominently libx264 and libx265.
-* `nonfree` Includes fdk-aac in addition to all the dependencies of the gpl variant.
-* `gpl-shared` Same as gpl, but comes with the libav* family of shared libs instead of pure static executables.
-* `lgpl-shared` Same again, but with the lgpl set of dependencies.
-* `nonfree-shared` Same again, but with the nonfree set of dependencies.
+* `lgpl-shared` Lacking libraries that are GPL-only, but with the lgpl set of dependencies.
 
 All of those can be optionally combined with any combination of addins:
 * `4.4`/`5.0`/`5.1`/`6.0`/`6.1`/`7.0` to build from the respective release branch instead of master.
 * `debug` to not strip debug symbols from the binaries. This increases the output size by about 250MB.
 * `lto` build all dependencies and ffmpeg with -flto=auto (HIGHLY EXPERIMENTAL, broken for Windows, sometimes works for Linux)
+
+For the mac please install these brew tools:
+
+* ```brew install automake fdk-aac git lame libass libtool libvorbis libvpx \
+opus sdl shtool texi2html theora wget x264 x265 xvid nasm```

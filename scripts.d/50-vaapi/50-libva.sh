@@ -28,6 +28,14 @@ ffbuild_dockerbuild() {
         --prefix="$FFBUILD_PREFIX"
         --buildtype=release
         -Denable_docs=false
+        --enable-shared
+        --disable-static
+        --with-pic
+        --disable-docs
+        --enable-drm
+        --disable-x11
+        --disable-glx
+        --disable-wayland
     )
 
     if [[ $TARGET == linux64 ]]; then
@@ -61,9 +69,9 @@ ffbuild_dockerbuild() {
 
     if [[ $TARGET == linux* ]]; then
         gen-implib "$FFBUILD_PREFIX"/lib/{libva.so.2,libva.a}
-        gen-implib "$FFBUILD_PREFIX"/lib/{libva-drm.so.2,libva-drm.a}
-        gen-implib "$FFBUILD_PREFIX"/lib/{libva-x11.so.2,libva-x11.a}
-        rm "$FFBUILD_PREFIX"/lib/libva{,-drm,-x11}.so*
+        # gen-implib "$FFBUILD_PREFIX"/lib/{libva-drm.so.2,libva-drm.a}
+        # gen-implib "$FFBUILD_PREFIX"/lib/{libva-x11.so.2,libva-x11.a}
+        rm "$FFBUILD_PREFIX"/lib/libva{.so*,.la}
 
         echo "Libs: -ldl" >> "$FFBUILD_PREFIX"/lib/pkgconfig/libva.pc
     fi

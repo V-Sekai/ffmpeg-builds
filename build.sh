@@ -1,6 +1,5 @@
 #!/bin/bash
 set -xe
-shopt -s globstar
 cd "$(dirname "$0")"
 source util/vars.sh
 
@@ -10,11 +9,21 @@ for addin in ${ADDINS[*]}; do
     source "addins/${addin}.sh"
 done
 
-if docker info -f "{{println .SecurityOptions}}" | grep rootless >/dev/null 2>&1; then
-    UIDARGS=()
-else
-    UIDARGS=( -u "$(id -u):$(id -g)" )
-fi
+for script in $(find scripts.d -name '*.sh'); do
+    FF_CONFIGURE+=" $(get_output $script configure)"
+    FF_CFLAGS+=" $(get_output $script cflags)"
+    FF_CXXFLAGS+=" $(get_output $script cxxflags)"
+    FF_LDFLAGS+=" $(get_output $script ldflags)"
+    FF_LDEXEFLAGS+=" $(get_output $script ldexeflags)"
+    FF_LIBS+=" $(get_output $script libs)"
+done
+
+FF_CONFIGURE="$(xargs <<< "$FF_CONFIGURE")"
+FF_CFLAGS="$(xargs <<< "$FF_CFLAGS")"
+FF_CXXFLAGS="$(xargs <<< "$FF_CXXFLAGS")"
+FF_LDFLAGS="$(xargs <<< "$FF_LDFLAGS")"
+FF_LDEXEFLAGS="$(xargs <<< "$FF_LDEXEFLAGS")"
+FF_LIBS="$(xargs <<< "$FF_LIBS")"
 
 rm -rf ffbuild
 mkdir ffbuild
@@ -24,29 +33,19 @@ FFMPEG_REPO="${FFMPEG_REPO_OVERRIDE:-$FFMPEG_REPO}"
 GIT_BRANCH="${GIT_BRANCH:-master}"
 GIT_BRANCH="${GIT_BRANCH_OVERRIDE:-$GIT_BRANCH}"
 
-BUILD_SCRIPT="$(mktemp)"
-trap "rm -f -- '$BUILD_SCRIPT'" EXIT
+cd ffbuild
+rm -rf ffmpeg prefix
 
-cat <<EOF >"$BUILD_SCRIPT"
-    set -xe
-    cd /ffbuild
-    rm -rf ffmpeg prefix
+git clone --filter=blob:none --branch="$GIT_BRANCH" "$FFMPEG_REPO" ffmpeg
+cd ffmpeg
+./configure --prefix=../prefix --pkg-config-flags="--static" $FF_CONFIGURE \
+    --extra-cflags="$FF_CFLAGS" --extra-cxxflags="$FF_CXXFLAGS" \
+    --extra-ldflags="$FF_LDFLAGS -Wl,-ld_classic" --extra-ldexeflags="$FF_LDEXEFLAGS" --extra-libs="$FF_LIBS" \
+    --extra-version="$(date +%Y%m%d)"
+make -j$(sysctl -n hw.logicalcpu)
+make install install-doc
 
-    git clone --filter=blob:none --branch='$GIT_BRANCH' '$FFMPEG_REPO' ffmpeg
-    cd ffmpeg
-
-    ./configure --prefix=/ffbuild/prefix --pkg-config-flags="--static" \$FFBUILD_TARGET_FLAGS \$FF_CONFIGURE \
-        --extra-cflags="\$FF_CFLAGS" --extra-cxxflags="\$FF_CXXFLAGS" --extra-libs="\$FF_LIBS" \
-        --extra-ldflags="\$FF_LDFLAGS" --extra-ldexeflags="\$FF_LDEXEFLAGS" \
-        --cc="\$CC" --cxx="\$CXX" --ar="\$AR" --ranlib="\$RANLIB" --nm="\$NM" \
-        --extra-version="\$(date +%Y%m%d)"
-    make -j\$(nproc) V=1
-    make install install-doc
-EOF
-
-[[ -t 1 ]] && TTY_ARG="-t" || TTY_ARG=""
-
-docker run --rm -i $TTY_ARG "${UIDARGS[@]}" -v "$PWD/ffbuild":/ffbuild -v "$BUILD_SCRIPT":/build.sh "$IMAGE" bash /build.sh
+cd ..
 
 mkdir -p artifacts
 ARTIFACTS_PATH="$PWD/artifacts"
@@ -58,13 +57,8 @@ package_variant ffbuild/prefix "ffbuild/pkgroot/$BUILD_NAME"
 [[ -n "$LICENSE_FILE" ]] && cp "ffbuild/ffmpeg/$LICENSE_FILE" "ffbuild/pkgroot/$BUILD_NAME/LICENSE.txt"
 
 cd ffbuild/pkgroot
-if [[ "${TARGET}" == win* ]]; then
-    OUTPUT_FNAME="${BUILD_NAME}.zip"
-    docker run --rm -i $TTY_ARG "${UIDARGS[@]}" -v "${ARTIFACTS_PATH}":/out -v "${PWD}/${BUILD_NAME}":"/${BUILD_NAME}" -w / "$IMAGE" zip -9 -r "/out/${OUTPUT_FNAME}" "$BUILD_NAME"
-else
-    OUTPUT_FNAME="${BUILD_NAME}.tar.xz"
-    docker run --rm -i $TTY_ARG "${UIDARGS[@]}" -v "${ARTIFACTS_PATH}":/out -v "${PWD}/${BUILD_NAME}":"/${BUILD_NAME}" -w / "$IMAGE" tar cJf "/out/${OUTPUT_FNAME}" "$BUILD_NAME"
-fi
+OUTPUT_FNAME="${BUILD_NAME}.tar.xz"
+tar cJf "${ARTIFACTS_PATH}/${OUTPUT_FNAME}" "$BUILD_NAME"
 cd -
 
 rm -rf ffbuild
